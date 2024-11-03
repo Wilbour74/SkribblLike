@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    .new-class{
+        background-color: green;
+        padding: 10px;
+        color: white;
+        font-size: 20px;
+        text-align: center;
+    }
+
+    .content{
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+    }
+    body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  canvas {
+    border: 2px solid black;
+    background-color: #fff;
+    margin-top: 20px;
+    cursor: crosshair;
+  }
+  
+  .color-picker {
+    display: flex;
+    margin-bottom: 20px;
+  }
+  
+  .color-btn, .eraser-btn {
+    width: 40px;
+    height: 40px;
+    margin: 0 5px;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+  
+  .eraser-btn {
+    font-size: 20px;
+    border: 1px solid #000;
+  }
+  
+  .color-btn:focus, .eraser-btn:focus {
+    outline: 2px solid #000;
+  }
+  
+  .line-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .line-btn {
+    padding: 10px 15px;
+    font-size: 18px;
+    cursor: pointer;
+    border: 1px solid #000;
+    background-color: #f0f0f0;
+  }
+  
+  .line-btn:focus {
+    outline: 2px solid black;
+  }
+  
+</style>
+<body>
+    <h1>Gribouille.io</h1>
+    <div class="content">
+        <input type="text" id="input">
+        <button onClick="send()">Envoyer</button>
+    </div>
+    <pre id="output"></pre>
+    <div id="client_name"></div>
+    <div id="clientCount">Clients connectés : 0</div>
+    <h2>Guess what</h2>
+
+  <div class="color-picker">
+    <button id="start-btn" onclick="toggleDrawing()">Start</button>
+    <button class="color-btn" data-color="black" style="background-color: black;"></button>
+    <button class="color-btn" data-color="brown" style="background-color: brown;"></button>
+    <button class="color-btn" data-color="blue" style="background-color: blue;"></button>
+    <button class="color-btn" data-color="red" style="background-color: red;"></button>
+    <button class="color-btn" data-color="green" style="background-color: green;"></button>
+    <button class="color-btn" data-color="yellow" style="background-color: yellow;"></button>
+
+    <button class="eraser-btn" data-color="white" style="background-color: white;">
+      🧽
+    </button>
+  </div>
+
+  <div class="line-buttons">
+    <button class="line-btn" data-width="5">5px</button>
+    <button class="line-btn" data-width="10">10px</button>
+    <button class="line-btn" data-width="15">15px</button>
+    <button class="line-btn" data-width="20">20px</button>
+  </div>
+
+  <canvas id="elCanvas"></canvas>
+</body>
+  <script>
+       var input = document.getElementById('input')
+  var output = document.getElementById('output')
+
+  var clientCount = document.getElementById('clientCount');
+  var socket = new WebSocket("ws://localhost:9090/echo")
+  var urlParams = new URLSearchParams(window.location.search);
+var name = urlParams.get('name');
+var roomID = urlParams.get('room');
+var creator = document.getElementById('client_name')
+var socket = new WebSocket(`ws://localhost:9090/echo?room=${roomID}&name=${name}`);
+var drawingEnabled = false;
+var button = document.getElementById('start-btn')
+var mot = sessionStorage.getItem("mot")
+
+
+let gameStarted = false;
+  output.classList.add("new-class")
+
+  socket.onopen = function(){
+      output.innerHTML += "Messages :\n"
+  }
+
+  socket.onmessage = function(e) {
+    let data = JSON.parse(e.data);
+    
+    switch (data.type) {
+        case 'message':
+            output.innerHTML += `${data.expediteur}: ${data.message}<br>`;
+            console.log(data);
+            console.log(data.message)
+            var mot = sessionStorage.getItem("mot")
+            console.log(mot)
+
+            if(mot == data.message){
+              socket.send(JSON.stringify({ type: 'reponse', message: `${data.expediteur} a trouvé le MOT`}));
+            }
+            break;
+
+        case 'client_count':
+            console.log(data);
+            clientCount.innerHTML = `Joueurs connectés : ${data.message}`;
+            sessionStorage.setItem("count", data.count);
+            break;
+
+        case 'room_creator':
+            if (creator.innerHTML == "") {
+              creator.innerHTML += `<strong>${data.message} est le maître du jeu</strong><br>`;
+            }
+            if (data.message !== name) {
+                button.style.display = 'none';
+            }
+            break;
+
+        case 'draw':
+            drawSocket(data.x, data.y, data.color, data.lineWidth);
+            break;
+
+        case 'connect':
+            output.innerHTML += `${data.message}<br>`;
+            break;
+
+        case 'disconnect':
+            output.innerHTML += `${data.message}<br>`;
+            break;
+
+        case 'game_started':
+            output.innerHTML += `<strong>${data.message}</strong><br>`;
+            console.log(data);
+            sessionStorage.setItem("mot", data.word)
+            break;
+
+        case 'reponse':
+            output.innerHTML += `${data.message}<br>`;
+            
+            break;
+        default:
+            console.log('Type de message inconnu:', data.type);
+    }
+};
+  function send(){
+      var name = sessionStorage.getItem("name")
+      socket.send(JSON.stringify({ type: 'message', message: input.value, expediteur: name }));
+      input.value = "";
+  }
+
+  function toggleDrawing() {
+
+    var count = sessionStorage.getItem("count")
+    if(count <= 1){
+      alert("Tu es seul invite quelqu'un pour jouer")
+    }else{
+    drawingEnabled = !drawingEnabled;
+    var startBtn = document.getElementById("start-btn");
+    
+    if (!gameStarted) {
+            socket.send(JSON.stringify({ type: 'start_game' }));
+            gameStarted = true;
+            startBtn.style.display = "none";
+            canvas.addEventListener('mousedown', startPosition);
+            canvas.addEventListener('mouseup', endPosition);
+            canvas.addEventListener('mousemove', draw);
+      } else {
+          // Si le jeu est déjà en cours, arrêtez le dessin
+          startBtn.innerText = "Start";
+          drawingEnabled = false;
+          canvas.removeEventListener('mousedown', startPosition);
+          canvas.removeEventListener('mouseup', endPosition);
+          canvas.removeEventListener('mousemove', draw);
+      }
+  }
+}
+
+
+  const canvas = document.getElementById('elCanvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = window.innerWidth * 0.8;
+  canvas.height = window.innerHeight * 0.8;
+
+  let painting = false;
+  let drawColor = 'black';
+  let lineWidth = 5;
+
+  function startPosition(e) {
+    painting = true;
+    draw(e); 
+  }
+
+  function endPosition() {
+    painting = false;
+    ctx.beginPath();
+  }
+
+  function draw(e) {
+    if (!painting) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = drawColor;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+
+    socket.send(JSON.stringify({
+      type: 'draw',
+      x: x,
+      y: y,
+      color: drawColor,
+      lineWidth: lineWidth
+    }));
+  }
+
+  function drawSocket(x, y, color, lineWidth) {
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = color;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+
+  function changeColor(e) {
+    drawColor = e.target.getAttribute('data-color');
+  }
+
+  function changeLine(e) {
+    lineWidth = e.target.getAttribute('data-width');
+  }
+
+  // canvas.addEventListener('mousedown', startPosition);
+  // canvas.addEventListener('mouseup', endPosition);
+  // canvas.addEventListener('mousemove', draw);
+
+  const colorButtons = document.querySelectorAll('.color-btn, .eraser-btn');
+  colorButtons.forEach(button => button.addEventListener('click', changeColor));
+
+  const widthButtons = document.querySelectorAll('.line-btn');
+  widthButtons.forEach(button => button.addEventListener('click', changeLine));
+    </script>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gribouille</title>
+    <link href="main.css" rel="stylesheet" >
+</head>
+<body style="    width: 100%;
+    height: 100vh;">
+    <div id="div_Content" style="    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    justify-content: center;">
+        <p>Entrer votre pseudo:</p>
+        <input type="text" id="inputName"></input>
+        
+        <p>Créer ou rejoindre une partie (laisser vide pour en créer une 😁):</p>
+        <input type="text" id="inputRoom" placeholder="ID de la partie"></input>
+        
+        <button onClick="send()" style="margin: 20px 0px;">Créer / Rejoindre</button>
+    </div>
+
+    <script>
+        function send(){
+            var name = document.getElementById('inputName').value;
+            if (name) {                
+                var roomID = document.getElementById('inputRoom').value || generateRoomID();
+    
+                sessionStorage.setItem("name", name);
+                sessionStorage.setItem("roomID", roomID);
+    
+                document.location.href = `http://localhost:9090/skribbl?name=${name}&room=${roomID}`;
+            } else {
+                window.alert("veuillez entrer votre nom");
+            }
+        }
+
+        function generateRoomID() {
+            return Math.random().toString(36).substring(2, 10);
+        }
+    </script>
+</body>
+</html>
